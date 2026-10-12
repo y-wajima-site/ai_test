@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>ふわもこ スイーツドロップ 🍓✨</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        body {
+            background: linear-gradient(135deg, #ffe5ec 0%, #ffc8dd 50%, #ffafcc 100%);
+            overflow: hidden;
+        }
+        .pop-shadow {
+            box-shadow: 0 8px 0px #ff85a2, 0 15px 20px rgba(0, 0, 0, 0.15);
+        }
+        .pop-shadow-sm {
+            box-shadow: 0 4px 0px #ff85a2;
+        }
+        .btn-bounce {
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+        }
+        .btn-bounce:active {
+            transform: translateY(4px);
+            box-shadow: 0 4px 0px #ff85a2;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-8px) rotate(3deg); }
+        }
+        .floating {
+            animation: float 3s ease-in-out infinite;
+        }
+        canvas {
+            touch-action: none;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-center p-2 sm:p-4 text-pink-900">
+
+    <!-- ゲーム全体コンテナ -->
+    <div class="relative w-full max-w-sm h-full max-h-[750px] bg-white/85 backdrop-blur-md rounded-3xl border-4 border-white pop-shadow flex flex-col justify-between overflow-hidden p-3">
+        
+        <!-- ヘッダー（スコア＆NEXT表示） -->
+        <div class="flex justify-between items-center bg-pink-100/90 rounded-2xl p-2 border-2 border-pink-200 shadow-inner">
+            <div class="flex flex-col items-center px-2">
+                <span class="text-xs font-bold text-pink-400">SCORE</span>
+                <span id="score" class="text-2xl font-black text-pink-600">0</span>
+            </div>
+            
+            <div class="flex flex-col items-center">
+                <span class="text-xs font-bold text-pink-400 mb-1">つぎのスイーツ</span>
+                <div id="next-preview" class="w-10 h-10 rounded-full bg-white border-2 border-pink-300 flex items-center justify-center text-xl shadow-sm">
+                    🍒
+                </div>
+            </div>
+
+            <div class="flex flex-col items-center px-2">
+                <span class="text-xs font-bold text-pink-400">BEST</span>
+                <span id="best-score" class="text-2xl font-black text-pink-500">0</span>
+            </div>
+        </div>
+
+        <!-- プレイエリア (Canvas) -->
+        <div class="relative flex-1 my-2 bg-gradient-to-b from-pink-50/50 to-white/80 rounded-2xl border-2 border-pink-200 overflow-hidden flex items-center justify-center">
+            <canvas id="gameCanvas" class="w-full h-full"></canvas>
+            
+            <!-- タップ案内表示 -->
+            <div id="tap-hint" class="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-none text-xs font-bold text-pink-400 bg-white/90 px-3 py-1.5 rounded-full border border-pink-200 animate-pulse">
+                👈 左右にスライドして手をはなす 👉
+            </div>
+        </div>
+
+        <!-- スイーツ図鑑ミニガイド -->
+        <div class="flex justify-between items-center px-2 py-1 bg-pink-50 rounded-xl border border-pink-100 text-[10px] text-pink-400 overflow-x-auto">
+            <span>🍒</span>➔<span>🍓</span>➔<span>🍇</span>➔<span>🍊</span>➔<span>🍎</span>➔<span>🍑</span>➔<span>🍍</span>➔<span>🍈</span>➔<span>🍉</span>➔<span>👑</span>
+        </div>
+
+        <!-- スタート画面オーバーレイ -->
+        <div id="start-screen" class="absolute inset-0 bg-gradient-to-b from-pink-100/95 via-pink-200/95 to-pink-300/95 backdrop-blur-md rounded-2xl flex flex-col items-center justify-center p-6 text-center z-20">
+            <div class="text-5xl mb-2 floating">🍓✨</div>
+            <h1 class="text-3xl font-black text-pink-600 mb-1 tracking-wider">ふわもこ<br>スイーツドロップ</h1>
+            <p class="text-xs font-bold text-pink-400 mb-6 bg-white/80 px-3 py-1 rounded-full">おなじスイーツをあわせて大きくしよう！</p>
+            
+            <button id="start-btn" class="w-full py-4 bg-gradient-to-r from-pink-400 to-rose-400 text-white font-black text-xl rounded-2xl border-2 border-white pop-shadow-sm btn-bounce hover:brightness-105 active:scale-95 transition-all">
+                ゲームスタート 💖
+            </button>
+        </div>
+
+        <!-- 結果画面オーバーレイ -->
+        <div id="result-screen" class="hidden absolute inset-0 bg-pink-900/40 backdrop-blur-md rounded-2xl flex flex-col items-center justify-center p-6 text-center z-30">
+            <div class="bg-white rounded-3xl p-6 border-4 border-pink-300 pop-shadow w-full max-w-[280px] flex flex-col items-center">
+                <div id="result-icon" class="text-5xl mb-2">🍰</div>
+                <h2 class="text-2xl font-black text-pink-600 mb-1">GAME OVER</h2>
+                <div id="result-title" class="text-xs font-bold text-pink-400 mb-4 bg-pink-50 px-3 py-1 rounded-full border border-pink-200">
+                    「すいーつ見習い」
+                </div>
+                
+                <div class="w-full bg-pink-50 rounded-2xl p-3 mb-4 border border-pink-100">
+                    <div class="text-xs font-bold text-pink-400">スコア</div>
+                    <div id="final-score" class="text-4xl font-black text-pink-600">0</div>
+                </div>
+
+                <button id="retry-btn" class="w-full py-3 bg-gradient-to-r from-pink-400 to-rose-400 text-white font-black text-lg rounded-2xl border-2 border-white pop-shadow-sm btn-bounce hover:brightness-105 active:scale-95 transition-all mb-2">
+                    もう一度遊ぶ 🔄
+                </button>
+                <button id="share-btn" class="w-full py-2 bg-sky-400 text-white font-bold text-sm rounded-xl border border-white hover:bg-sky-500 transition-all">
+                    結果をコピー 📋
+                </button>
+            </div>
+        </div>
+
+        <!-- トースト通知 UI -->
+        <div id="toast" class="hidden absolute bottom-12 left-1/2 -translate-x-1/2 bg-pink-600 text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg border border-pink-300 z-40 transition-all">
+            コピーしました！💖
+        </div>
+
+    </div>
+
+    <script>
+        // Web Audio APIによる効果音生成
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(type, level = 0) {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'drop') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(120, now + 0.15);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            } else if (type === 'pop') {
+                osc.type = 'triangle';
+                const baseFreq = 400 + level * 60;
+                osc.frequency.setValueAtTime(baseFreq, now);
+                osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, now + 0.12);
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
+                osc.start(now);
+                osc.stop(now + 0.12);
+            } else if (type === 'over') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(250, now);
+                osc.frequency.exponentialRampToValueAtTime(80, now + 0.4);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.4);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            }
+        }
+
+        // スイーツ定義 (レベル毎の半径、絵文字、得点、色)
+        const SWEETS = [
+            { radius: 16, emoji: '🍒', score: 2,   bg: '#ffb3ba' },
+            { radius: 22, emoji: '🍓', score: 4,   bg: '#ff6b81' },
+            { radius: 28, emoji: '🍇', score: 8,   bg: '#a29bfe' },
+            { radius: 34, emoji: '🍊', score: 16,  bg: '#ffeaa7' },
+            { radius: 40, emoji: '🍎', score: 32,  bg: '#ff7675' },
+            { radius: 48, emoji: '🍑', score: 64,  bg: '#fab1a0' },
+            { radius: 56, emoji: '🍍', score: 128, bg: '#fdcb6e' },
+            { radius: 64, emoji: '🍈', score: 256, bg: '#55efc4' },
+            { radius: 74, emoji: '🍉', score: 512, bg: '#00b894' },
+            { radius: 85, emoji: '👑', score: 1024,bg: '#fd79a8' }
+        ];
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let width, height;
+        let balls = [];
+        let particles = [];
+        let score = 0;
+        let bestScore = parseInt(localStorage.getItem('sweets_best_score') || '0');
+        let currentLevel = 0;
+        let nextLevel = 0;
+        let dropX = 0;
+        let canDrop = true;
+        let isGameOver = false;
+        let gameOverTimer = 0;
+        const DANGER_LINE_Y = 60;
+
+        document.getElementById('best-score').textContent = bestScore;
+
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            width = canvas.width;
+            height = canvas.height;
+            dropX = width / 2;
+        }
+
+        function getRandomLevel() {
+            return Math.floor(Math.random() * 4); // 最初は 🍒, 🍓, 🍇, 🍊 のみ
+        }
+
+        function initGame() {
+            balls = [];
+            particles = [];
+            score = 0;
+            isGameOver = false;
+            canDrop = true;
+            gameOverTimer = 0;
+            currentLevel = getRandomLevel();
+            nextLevel = getRandomLevel();
+            
+            document.getElementById('score').textContent = score;
+            document.getElementById('next-preview').textContent = SWEETS[nextLevel].emoji;
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('tap-hint').classList.remove('opacity-0');
+            
+            resizeCanvas();
+            requestAnimationFrame(update);
+        }
+
+        // ボール（スイーツ）クラス
+        class Ball {
+            constructor(x, y, level) {
+                this.x = x;
+                this.y = y;
+                this.level = level;
+                this.radius = SWEETS[level].radius;
+                this.vx = 0;
+                this.vy = 0;
+                this.scale = 0;
+            }
+
+            update() {
+                if (this.scale < 1) this.scale += 0.1;
+
+                this.vy += 0.35; // 重力
+                this.vx *= 0.98; // 空気抵抗
+                this.vy *= 0.98;
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // 壁との衝突判定
+                if (this.x - this.radius < 0) {
+                    this.x = this.radius;
+                    this.vx *= -0.3;
+                }
+                if (this.x + this.radius > width) {
+                    this.x = width - this.radius;
+                    this.vx *= -0.3;
+                }
+                // 床との衝突判定
+                if (this.y + this.radius > height) {
+                    this.y = height - this.radius;
+                    this.vy *= -0.2;
+                    this.vx *= 0.8;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.scale(this.scale, this.scale);
+
+                // 影
+                ctx.beginPath();
+                ctx.arc(2, 4, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0,0,0,0.08)';
+                ctx.fill();
+
+                // 本体背景
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = SWEETS[this.level].bg;
+                ctx.fill();
+                ctx.lineWidth = 2.5;
+                ctx.strokeStyle = '#ffffff';
+                ctx.stroke();
+
+                // 絵文字テキスト
+                ctx.font = `${this.radius * 1.1}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(SWEETS[this.level].emoji, 0, 2);
+
+                ctx.restore();
+            }
+        }
+
+        // パーティクルクラス
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.radius = Math.random() * 4 + 2;
+                this.vx = (Math.random() - 0.5) * 8;
+                this.vy = (Math.random() - 0.5) * 8;
+                this.alpha = 1;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= 0.03;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.alpha);
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function handleMove(e) {
+            if (isGameOver) return;
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const r = SWEETS[currentLevel].radius;
+            dropX = Math.max(r, Math.min(width - r, clientX - rect.left));
+        }
+
+        function handleRelease() {
+            if (!canDrop || isGameOver) return;
+
+            // スイーツ投下
+            balls.push(new Ball(dropX, 35, currentLevel));
+            playSound('drop');
+
+            canDrop = false;
+            document.getElementById('tap-hint').classList.add('opacity-0');
+
+            setTimeout(() => {
+                if (!isGameOver) {
+                    currentLevel = nextLevel;
+                    nextLevel = getRandomLevel();
+                    document.getElementById('next-preview').textContent = SWEETS[nextLevel].emoji;
+                    canDrop = true;
+                }
+            }, 500);
+        }
+
+        canvas.addEventListener('mousemove', handleMove);
+        canvas.addEventListener('touchmove', handleMove, { passive: true });
+        canvas.addEventListener('mouseup', handleRelease);
+        canvas.addEventListener('touchend', handleRelease);
+
+        function handleCollisions() {
+            for (let i = 0; i < balls.length; i++) {
+                for (let j = i + 1; j < balls.length; j++) {
+                    const b1 = balls[i];
+                    const b2 = balls[j];
+
+                    const dx = b2.x - b1.x;
+                    const dy = b2.y - b1.y;
+                    const dist = Math.hypot(dx, dy);
+                    const minDist = b1.radius + b2.radius;
+
+                    if (dist < minDist) {
+                        // 同じ種類のスイーツがぶつかった場合 ➔ 合体！
+                        if (b1.level === b2.level && b1.level < SWEETS.length - 1) {
+                            const newLevel = b1.level + 1;
+                            const newX = (b1.x + b2.x) / 2;
+                            const newY = (b1.y + b2.y) / 2;
+
+                            balls.splice(j, 1);
+                            balls.splice(i, 1);
+                            balls.push(new Ball(newX, newY, newLevel));
+
+                            for (let p = 0; p < 12; p++) {
+                                particles.push(new Particle(newX, newY, SWEETS[newLevel].bg));
+                            }
+                            score += SWEETS[newLevel].score;
+                            document.getElementById('score').textContent = score;
+                            if (score > bestScore) {
+                                bestScore = score;
+                                localStorage.setItem('sweets_best_score', bestScore);
+                                document.getElementById('best-score').textContent = bestScore;
+                            }
+
+                            playSound('pop', newLevel);
+                            return;
+                        }
+
+                        // 物理反発
+                        const overlap = minDist - dist;
+                        const nx = dx / (dist || 1);
+                        const ny = dy / (dist || 1);
+
+                        b1.x -= nx * overlap * 0.5;
+                        b1.y -= ny * overlap * 0.5;
+                        b2.x += nx * overlap * 0.5;
+                        b2.y += ny * overlap * 0.5;
+
+                        const k = 0.05;
+                        b1.vx -= nx * k;
+                        b1.vy -= ny * k;
+                        b2.vx += nx * k;
+                        b2.vy += ny * k;
+                    }
+                }
+            }
+        }
+
+        function update() {
+            ctx.clearRect(0, 0, width, height);
+
+            // 限界線（デンジャーライン）
+            ctx.beginPath();
+            ctx.setLineDash([6, 6]);
+            ctx.moveTo(0, DANGER_LINE_Y);
+            ctx.lineTo(width, DANGER_LINE_Y);
+            ctx.strokeStyle = '#ff85a2';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 落下ガイド＆待機スイーツ
+            if (canDrop && !isGameOver) {
+                const r = SWEETS[currentLevel].radius;
+                
+                ctx.beginPath();
+                ctx.moveTo(dropX, 35);
+                ctx.lineTo(dropX, height);
+                ctx.strokeStyle = 'rgba(255, 182, 193, 0.4)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.save();
+                ctx.translate(dropX, 35);
+                ctx.beginPath();
+                ctx.arc(0, 0, r, 0, Math.PI * 2);
+                ctx.fillStyle = SWEETS[currentLevel].bg;
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#ffffff';
+                ctx.stroke();
+                ctx.font = `${r * 1.1}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(SWEETS[currentLevel].emoji, 0, 2);
+                ctx.restore();
+            }
+
+            // スイーツ描画
+            balls.forEach(ball => {
+                ball.update();
+                ball.draw();
+            });
+
+            // パーティクル描画
+            particles.forEach((p, idx) => {
+                p.update();
+                p.draw();
+                if (p.alpha <= 0) particles.splice(idx, 1);
+            });
+
+            handleCollisions();
+
+            // ゲームオーバー判定
+            let isOverflow = false;
+            balls.forEach(ball => {
+                if (ball.y - ball.radius < DANGER_LINE_Y && Math.abs(ball.vy) < 0.2) {
+                    isOverflow = true;
+                }
+            });
+
+            if (isOverflow) {
+                gameOverTimer++;
+                if (gameOverTimer > 90) {
+                    endGame();
+                    return;
+                }
+            } else {
+                gameOverTimer = Math.max(0, gameOverTimer - 1);
+            }
+
+            if (!isGameOver) {
+                requestAnimationFrame(update);
+            }
+        }
+
+        function endGame() {
+            isGameOver = true;
+            playSound('over');
+
+            let title = "スイーツ見習い 🍧";
+            let icon = "🍧";
+            if (score > 2000) { title = "伝説のパティシエ 👑"; icon = "👑"; }
+            else if (score > 1000) { title = "スイーツマスター ✨"; icon = "🎂"; }
+            else if (score > 500) { title = "カフェの看板娘 🍰"; icon = "🍰"; }
+            else if (score > 200) { title = "スイーツ好き高校生 🍓"; icon = "🍓"; }
+
+            document.getElementById('result-icon').textContent = icon;
+            document.getElementById('result-title').textContent = title;
+            document.getElementById('final-score').textContent = score;
+            document.getElementById('result-screen').classList.remove('hidden');
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 2000);
+        }
+
+        document.getElementById('start-btn').addEventListener('click', initGame);
+        document.getElementById('retry-btn').addEventListener('click', initGame);
+        
+        document.getElementById('share-btn').addEventListener('click', () => {
+            const text = `【ふわもこ スイーツドロップ 🍓✨】\nスコア: ${score}点！\nみんなもあそんでみてね！`;
+            const dummy = document.createElement('textarea');
+            document.body.appendChild(dummy);
+            dummy.value = text;
+            dummy.select();
+            document.execCommand('copy');
+            document.body.removeChild(dummy);
+            showToast('結果をコピーしました！💖');
+        });
+
+        window.addEventListener('resize', resizeCanvas);
+    </script>
+</body>
+</html>
